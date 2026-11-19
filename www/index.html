@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f766e" />
+  <title>Inventario de Almacén</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo-badge">📦</span>
+      <div>
+        <h1>Control de Inventario</h1>
+        <small id="estado-sync">Modo local offline (Teléfono)</small>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="tab-inventario">Inventario</button>
+      <button class="tab-btn" data-tab="tab-diario">Diario</button>
+      <button class="tab-btn" data-tab="tab-historial">Historial</button>
+      <button class="tab-btn" data-tab="tab-excel">Excel</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- PESTAÑA 1: INVENTARIO GENERAL -->
+    <section id="tab-inventario" class="tab-panel active">
+      <div class="card form-card">
+        <h2 id="form-titulo">Agregar / Actualizar Producto</h2>
+        <form id="form-producto" class="grid-form">
+          <input type="hidden" id="prod-id" />
+          <div class="field">
+            <label>Código</label>
+            <input type="text" id="prod-codigo" placeholder="Ej: 35-551" required />
+          </div>
+          <div class="field span-2">
+            <label>Nombre del Producto</label>
+            <input type="text" id="prod-nombre" placeholder="Ej: Azufre" required />
+          </div>
+          <div class="field">
+            <label>Tipo de Empaque</label>
+            <select id="prod-tipo">
+              <option value="Cajas" selected>Cajas (Por defecto)</option>
+              <option value="Sacos">Sacos</option>
+              <option value="Canecas">Canecas</option>
+              <option value="Galones">Galones</option>
+              <option value="Rollos">Rollos</option>
+              <option value="Unidades">Unidades Sueltas</option>
+            </select>
+          </div>
+          <div class="field">
+            <label id="lbl-factor">Cant. por Caja</label>
+            <input type="number" inputmode="decimal" step="any" id="prod-factor" value="1" min="0.01" required />
+          </div>
+          <div class="field">
+            <label id="lbl-empaques">Cantidad de Cajas</label>
+            <input type="number" inputmode="decimal" step="any" id="prod-empaques" value="0" min="0" required />
+          </div>
+          <div class="field">
+            <label>Cantidades Individuales</label>
+            <input type="number" inputmode="decimal" step="any" id="prod-individual" value="0" min="0" required />
+          </div>
+          <div class="field total-box">
+            <label>Total Calculado</label>
+            <div id="preview-total">0</div>
+          </div>
+          <div class="actions span-full">
+            <button type="submit" class="btn btn-primary">Guardar Producto</button>
+            <button type="button" id="btn-cancelar-edicion" class="btn btn-secondary hidden">Cancelar Edición</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="table-header">
+          <h2>Existencias (<span id="contador-productos">0</span>)</h2>
+          <input type="search" id="buscador-inventario" class="search-input" placeholder="Buscar por código o nombre..." />
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Producto</th>
+                <th>Empaque</th>
+                <th>Cant. x Emp.</th>
+                <th>Empaques</th>
+                <th>Indiv.</th>
+                <th>Total</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-inventario-body">
+              <tr><td colspan="8" class="empty-msg">Sin productos cargados.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 2: INVENTARIO DIARIO -->
+    <section id="tab-diario" class="tab-panel">
+      <div class="card">
+        <h2>Conciliación Diaria de Salidas y Conteo Físico</h2>
+        <p class="subtitle">Busca el producto, registra lo vendido ayer y verifica el conteo físico.</p>
+
+        <div class="diario-selector">
+          <input type="text" id="buscar-para-diario" list="datalist-productos" placeholder="Escribe código o nombre del producto..." />
+          <datalist id="datalist-productos"></datalist>
+          <button type="button" id="btn-agregar-diario" class="btn btn-primary">+ Agregar</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Producto</th>
+                <th>Stock Sist.</th>
+                <th>Vend. Ayer</th>
+                <th>Esperado</th>
+                <th>Físico</th>
+                <th>Diferencia</th>
+                <th>Quitar</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-diario-body">
+              <tr><td colspan="8" class="empty-msg">Aún no has agregado productos a la revisión diaria.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="actions" style="margin-top: 1rem;">
+          <button type="button" id="btn-confirmar-conciliacion" class="btn btn-success">Confirmar y Actualizar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 3: HISTORIAL DE CORTES / RESGUARDOS -->
+    <section id="tab-historial" class="tab-panel">
+      <div class="card">
+        <div class="table-header">
+          <h2>Historial de Cortes y Conciliaciones</h2>
+          <input type="date" id="filtro-fecha-excel" class="search-input" />
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Detalle</th>
+                <th>Registrado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-historial-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 4: IMPORTAR / EXPORTAR -->
+    <section id="tab-excel" class="tab-panel">
+      <div class="grid-2">
+        <div class="card">
+          <h2>1. Exportar y Plantilla de Ejemplo</h2>
+          <p class="subtitle">Genera y descarga archivos <code>.xlsx</code> directamente desde el teléfono.</p>
+          <div class="stack-btns">
+            <button type="button" id="btn-descargar-plantilla" class="btn btn-secondary">📥 Descargar Plantilla Excel de Ejemplo</button>
+            <button type="button" id="btn-exportar-hoy" class="btn btn-primary">📤 Exportar Inventario Actual (.xlsx)</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>2. Importar Inventario desde Excel</h2>
+          <p class="subtitle">Selecciona un archivo <code>.xlsx</code> o <code>.xls</code> desde tu dispositivo para actualizar o agregar productos.</p>
+          <form id="form-importar" class="stack-btns">
+            <input type="file" id="archivo-excel" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-success">⬆️ Importar a la App</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
